@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAI // The Map for People Obsessed with AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #050705;
+    --bg-1: #0a0f0a;
+    --panel: #0c130d;
+    --green: #00ff41;
+    --green-dim: #0a8f2c;
+    --green-bright: #7CFFA0;
+    --amber: #ffb000;
+    --red: #ff3b3b;
+    --ink: #c9ffd6;
+    --muted: #5f9d70;
+    --border: rgba(0,255,65,0.28);
+    --border-soft: rgba(0,255,65,0.14);
+    --glow: 0 0 12px rgba(0,255,65,0.35);
+    --radius: 6px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Share Tech Mono', monospace;
+    min-height:100vh;
+    overflow-x:hidden;
+    position:relative;
+  }
+  h1,h2,h3,.display{
+    font-family:'Share Tech Mono', monospace;
+    font-weight:700;
+    margin:0;
+    line-height:1.15;
+    color:var(--green-bright);
+    text-shadow:0 0 10px rgba(0,255,65,0.25);
+  }
+  a{color:inherit;}
+  button{font-family:inherit;cursor:pointer;}
+  ::selection{background:var(--green); color:#000;}
+  ::-webkit-scrollbar{width:10px;}
+  ::-webkit-scrollbar-track{background:#000;}
+  ::-webkit-scrollbar-thumb{background:var(--green-dim); border-radius:5px;}
+
+  /* ---------- Matrix rain canvas ---------- */
+  #matrixCanvas{
+    position:fixed; inset:0; width:100%; height:100%;
+    z-index:0; pointer-events:none;
+    opacity:0.14;
+    transition:opacity .6s ease;
+  }
+  #matrixCanvas.rain-hero{opacity:0.55;}
+
+  /* ---------- scanlines overlay ---------- */
+  .scanlines{
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 1px, transparent 1px, transparent 3px);
+    mix-blend-mode:overlay;
+    opacity:0.5;
+  }
+  .vignette{
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.65) 100%);
+  }
+
+  .screen{
+    display:none;
+    min-height:100vh;
+    width:100%;
+    flex-direction:column;
+    position:relative; z-index:2;
+  }
+  .screen.active{display:flex;}
+
+  .wrap{
+    max-width:940px;
+    margin:0 auto;
+    padding:32px 24px 90px;
+    width:100%;
+    flex:1;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* ---------- Top brand bar ---------- */
+  .brandbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    max-width:940px;
+    margin:0 auto;
+    width:100%;
+    padding:20px 24px 0;
+    position:relative; z-index:3;
+  }
+  .brand{
+    font-weight:700;
+    font-size:19px;
+    letter-spacing:2px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:var(--green-bright);
+    text-shadow:var(--glow);
+  }
+  .brand .cursor{
+    display:inline-block; width:9px; height:16px; background:var(--green);
+    animation:blink 1s steps(1) infinite;
+  }
+  @keyframes blink{50%{opacity:0;}}
+  .brand-right{display:flex; align-items:center; gap:14px;}
+  .step-indicator{ font-size:12px; color:var(--muted);}
+  .nav-link{
+    background:none; border:1px solid var(--border); color:var(--green-bright);
+    font-size:11.5px; padding:6px 11px; border-radius:4px; letter-spacing:1px;
+  }
+  .nav-link:hover{background:rgba(0,255,65,0.08); border-color:var(--green);}
+
+  /* ---------- Terminal window chrome (used for cards) ---------- */
+  .term{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:0 0 0 1px rgba(0,255,65,0.03), 0 12px 30px rgba(0,0,0,0.5);
+    overflow:hidden;
+  }
+  .term-bar{
+    display:flex; align-items:center; gap:7px;
+    padding:8px 12px;
+    background:#0a100b;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .term-dot{width:9px; height:9px; border-radius:50%;}
+  .term-dot.r{background:#ff5f56;}
+  .term-dot.y{background:#ffbd2e;}
+  .term-dot.g{background:#27c93f;}
+  .term-path{
+    margin-left:8px; font-size:11px; color:var(--muted); letter-spacing:0.5px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    border:1px solid var(--green);
+    border-radius:4px;
+    padding:13px 26px;
+    font-weight:700;
+    font-size:14.5px;
+    letter-spacing:1.5px;
+    font-family:'Share Tech Mono',monospace;
+    background:transparent;
+    color:var(--green-bright);
+    transition:all .15s ease;
+    text-transform:uppercase;
+  }
+  .btn-primary{
+    background:var(--green);
+    color:#001a06;
+    box-shadow:0 0 18px rgba(0,255,65,0.45);
+  }
+  .btn-primary:hover{background:var(--green-bright); box-shadow:0 0 26px rgba(0,255,65,0.7); transform:translateY(-1px);}
+  .btn-primary:disabled{
+    background:#123016; color:#3b6b47; border-color:#1c4425; box-shadow:none; cursor:not-allowed; transform:none;
+  }
+  .btn-ghost{
+    background:transparent; color:var(--green-bright); border:1px solid var(--border);
+  }
+  .btn-ghost:hover{border-color:var(--green); background:rgba(0,255,65,0.06);}
+
+  /* ---------- GATE / LAUNCH ---------- */
+  #screen-gate .wrap{
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    position:relative;
+  }
+  .boot-log{
+    font-size:12px; color:var(--green-dim); text-align:left;
+    max-width:420px; margin:0 auto 22px; min-height:100px;
+    border:1px solid var(--border-soft); border-radius:4px; padding:12px 14px;
+    background:rgba(0,15,5,0.5);
+  }
+  .boot-log div{margin-bottom:3px; white-space:pre;}
+  .boot-log .ok{color:var(--green-bright);}
+  .gate-content{
+    max-width:620px;
+    opacity:0; transform:translateY(14px);
+    transition:opacity .7s ease, transform .7s ease;
+  }
+  .gate-content.revealed{opacity:1; transform:translateY(0);}
+  .gate-badge{
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid var(--border); color:var(--green-bright);
+    font-weight:700; font-size:11.5px; letter-spacing:2px;
+    padding:7px 14px; border-radius:4px; margin-bottom:26px;
+    text-transform:uppercase;
+  }
+  .gate-logo{
+    font-family:'VT323', monospace;
+    font-size:clamp(70px, 16vw, 130px);
+    letter-spacing:6px;
+    color:var(--green-bright);
+    text-shadow:0 0 20px rgba(0,255,65,0.55), 0 0 60px rgba(0,255,65,0.25);
+    animation:flicker 4s infinite;
+  }
+  @keyframes flicker{
+    0%,19%,21%,23%,25%,54%,56%,100%{opacity:1;}
+    20%,22%,24%,55%{opacity:0.72;}
+  }
+  .gate-tagline{
+    font-size:clamp(15px, 2.6vw, 18px);
+    color:var(--ink);
+    margin:6px 0 8px;
+    line-height:1.6;
+  }
+  .gate-sub{
+    font-size:13px; color:var(--muted); margin-bottom:30px; line-height:1.7;
+  }
+  .resume-banner{
+    display:none;
+    border:1px solid var(--amber); color:var(--amber);
+    background:rgba(255,176,0,0.06);
+    font-size:12px; padding:10px 14px; border-radius:4px;
+    margin-bottom:22px; text-align:left;
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  }
+  .resume-banner button{
+    border:1px solid var(--amber); background:transparent; color:var(--amber);
+    font-size:11px; padding:5px 10px; border-radius:3px; letter-spacing:1px;
+  }
+  .resume-banner button:hover{background:rgba(255,176,0,0.12);}
+  .gate-btn-row{display:flex; gap:12px; justify-content:center; flex-wrap:wrap;}
+  .gate-fine{margin-top:22px; font-size:11px; color:var(--muted); letter-spacing:0.5px;}
+
+  /* ---------- Generic step header ---------- */
+  .step-head{margin-bottom:28px;}
+  .eyebrow-link{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:12px; color:var(--muted); font-weight:700;
+    margin-bottom:16px; background:none; border:none; padding:0; letter-spacing:1px;
+  }
+  .eyebrow-link:hover{color:var(--green-bright);}
+  .step-title{font-size:clamp(24px,4vw,32px); margin-bottom:8px;}
+  .step-title::before{content:"> "; color:var(--green-dim);}
+  .step-desc{color:var(--muted); font-size:14px; max-width:540px; line-height:1.6;}
+
+  /* ---------- Interests ---------- */
+  .chip-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(220px,1fr));
+    gap:12px;
+    margin:28px 0 20px;
+  }
+  .chip{
+    background:var(--panel);
+    border:1px solid var(--border-soft);
+    border-radius:4px;
+    padding:15px 16px;
+    text-align:left;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-weight:700;
+    font-size:13.5px;
+    color:var(--ink);
+    transition:all .15s ease;
+  }
+  .chip .emoji{font-size:19px; filter:grayscale(0.3);}
+  .chip:hover{border-color:var(--green-dim);}
+  .chip.selected{
+    border-color:var(--green);
+    background:rgba(0,255,65,0.08);
+    color:var(--green-bright);
+    box-shadow:inset 0 0 0 1px rgba(0,255,65,0.15);
+  }
+  .bottom-bar{
+    position:sticky; bottom:0;
+    background:linear-gradient(0deg, var(--bg) 55%, transparent);
+    padding:24px 0 4px;
+    display:flex; justify-content:flex-end; gap:12px;
+    margin-top:auto;
+  }
+
+  /* ---------- Domain grid ---------- */
+  .domain-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(270px,1fr));
+    gap:16px;
+    margin-top:26px;
+  }
+  .domain-card{
+    text-align:left; display:flex; flex-direction:column;
+    padding:0; cursor:pointer;
+    transition:transform .15s ease, border-color .15s ease;
+  }
+  .domain-card:hover{transform:translateY(-3px); border-color:var(--green-dim);}
+  .domain-body{padding:18px 18px 20px;}
+  .badge-fit{
+    font-size:10.5px; font-weight:700; letter-spacing:1px;
+    color:#001a06; background:var(--green);
+    padding:3px 8px; border-radius:3px; margin-left:8px;
+  }
+  .domain-icon{font-size:24px;}
+  .domain-name{font-weight:700; font-size:17px; color:var(--green-bright); margin:8px 0 8px; display:flex; align-items:center; flex-wrap:wrap; gap:4px;}
+  .domain-tagline{font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:12px;}
+  .domain-cta{
+    font-size:12px; font-weight:700; color:var(--green); letter-spacing:1px;
+    display:flex; align-items:center; gap:5px;
+  }
+
+  /* ---------- Timeframe screen ---------- */
+  .context-pill{
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid var(--border); color:var(--green-bright);
+    padding:7px 14px; border-radius:4px; font-weight:700; font-size:13px;
+    margin-bottom:18px;
+  }
+  .timeframe-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(150px,1fr));
+    gap:12px;
+    margin:26px 0 8px;
+  }
+  .tf-chip{
+    background:var(--panel);
+    border:1px solid var(--border-soft);
+    border-radius:4px;
+    padding:18px 14px;
+    text-align:center;
+    font-weight:700;
+    font-size:15px;
+    color:var(--ink);
+  }
+  .tf-chip small{display:block; font-weight:400; color:var(--muted); font-size:11px; margin-top:4px; letter-spacing:0.5px;}
+  .tf-chip:hover{border-color:var(--green-dim);}
+  .tf-chip.selected{border-color:var(--green); background:rgba(0,255,65,0.08); color:var(--green-bright);}
+  .start-row{margin-top:30px;}
+  .start-row .label{font-weight:700; font-size:13px; margin-bottom:10px; display:block; color:var(--green-bright);}
+  .start-row .label::before{content:"$ "; color:var(--green-dim);}
+  .radio-row{display:flex; flex-wrap:wrap; gap:10px;}
+  .radio-chip{
+    border:1px solid var(--border-soft); background:var(--panel);
+    border-radius:4px; padding:9px 16px; font-size:13px; font-weight:700; color:var(--ink);
+  }
+  .radio-chip.selected{border-color:var(--amber); background:rgba(255,176,0,0.08); color:var(--amber);}
+
+  /* ---------- Roadmap screen ---------- */
+  .roadmap-head{margin-bottom:8px;}
+  .roadmap-title{font-size:clamp(22px,4vw,30px);}
+  .roadmap-title::before{content:"root@kai:~$ ./"; color:var(--green-dim); font-size:0.5em; display:block; margin-bottom:6px; letter-spacing:0;}
+  .roadmap-meta{color:var(--muted); font-size:13px; margin-top:8px;}
+  .progress-wrap{margin:22px 0 34px;}
+  .progress-labels{display:flex; justify-content:space-between; font-size:12.5px; font-weight:700; margin-bottom:8px; color:var(--green-bright);}
+  .progress-track{height:14px; background:var(--panel); border:1px solid var(--border-soft); border-radius:3px; overflow:hidden;}
+  .progress-fill{height:100%; background:repeating-linear-gradient(45deg, var(--green) 0, var(--green) 6px, var(--green-dim) 6px, var(--green-dim) 12px); width:0%; transition:width .5s ease; box-shadow:0 0 10px rgba(0,255,65,0.6);}
+  .progress-cheer{font-size:12.5px; color:var(--amber); font-weight:700; margin-top:9px; min-height:16px;}
+
+  .timeline{position:relative; padding-left:32px; margin-top:10px;}
+  .timeline::before{
+    content:"";
+    position:absolute; left:12px; top:6px; bottom:6px; width:2px;
+    background:linear-gradient(180deg, var(--green), var(--amber));
+    opacity:0.4;
+  }
+  .module{position:relative; margin-bottom:26px;}
+  .module-node{
+    position:absolute; left:-32px; top:2px;
+    width:26px; height:26px; border-radius:50%;
+    background:var(--bg); border:2px solid var(--green-dim);
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; z-index:1; color:var(--green-bright); font-weight:700;
+  }
+  .module.done .module-node{background:var(--green); border-color:var(--green); color:#001a06;}
+  .module-card{padding:18px 20px 20px;}
+  .module-week{
+    display:inline-block; font-size:11px; font-weight:700; color:var(--amber);
+    border:1px solid rgba(255,176,0,0.3); padding:3px 9px; border-radius:3px; margin-bottom:10px; letter-spacing:1px;
+  }
+  .module-title{font-weight:700; font-size:16.5px; margin-bottom:6px; color:var(--green-bright);}
+  .module-desc{font-size:13.5px; color:var(--muted); line-height:1.6; margin-bottom:14px;}
+  .resource-row{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
+  .resource-pill{
+    font-size:12px; font-weight:700; text-decoration:none;
+    border:1px solid var(--border-soft); color:var(--green-bright); padding:5px 11px; border-radius:3px;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .resource-pill:hover{border-color:var(--green); background:rgba(0,255,65,0.06);}
+  .task-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px;}
+  .task-list li{display:flex; align-items:flex-start; gap:10px; font-size:13.5px;}
+  .task-list input[type=checkbox]{
+    margin-top:2px; width:16px; height:16px; accent-color:var(--green); cursor:pointer; flex-shrink:0;
+  }
+  .task-list label{cursor:pointer;}
+  .task-list li.checked label{color:var(--muted); text-decoration:line-through;}
+
+  .motivation-box{
+    margin-top:14px;
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:24px 24px;
+    background:radial-gradient(circle at top left, rgba(0,255,65,0.07), transparent 60%), var(--panel);
+  }
+  .motivation-box h3{font-size:16px; margin-bottom:12px; letter-spacing:1px;}
+  .quote-text{font-size:15px; font-weight:700; line-height:1.6; margin-bottom:10px; color:var(--ink);}
+  .quote-text::before{content:"> ";color:var(--green-dim);}
+  .quote-refresh{
+    background:transparent; border:1px solid var(--border); color:var(--green-bright); font-size:11.5px;
+    padding:6px 12px; border-radius:3px; font-weight:700; letter-spacing:1px;
+  }
+  .quote-refresh:hover{border-color:var(--green); background:rgba(0,255,65,0.06);}
+  .channel-row{display:flex; flex-wrap:wrap; gap:10px; margin-top:18px;}
+  .channel-pill{
+    border:1px solid var(--border-soft);
+    color:var(--green-bright); text-decoration:none; font-size:12px; font-weight:700;
+    padding:7px 13px; border-radius:3px;
+  }
+  .channel-pill:hover{border-color:var(--green); background:rgba(0,255,65,0.06);}
+
+  .roadmap-actions{display:flex; flex-wrap:wrap; gap:10px; margin-top:34px;}
+
+  /* ---------- Contact / Support screen ---------- */
+  #screen-contact .wrap{align-items:center; justify-content:center;}
+  .contact-card{max-width:520px; width:100%;}
+  .contact-body{padding:26px 26px 28px;}
+  .contact-ascii{
+    font-family:'VT323', monospace; font-size:15px; color:var(--green-dim);
+    line-height:1.25; white-space:pre; margin-bottom:16px; overflow-x:auto;
+  }
+  .contact-title{font-size:22px; margin-bottom:10px;}
+  .contact-desc{font-size:13.5px; color:var(--muted); line-height:1.7; margin-bottom:20px;}
+  .contact-line{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    border:1px solid var(--border-soft); border-radius:4px; padding:12px 14px; margin-bottom:18px;
+    font-size:13.5px;
+  }
+  .contact-email{color:var(--green-bright); font-weight:700;}
+  .copy-btn{
+    border:1px solid var(--border); background:transparent; color:var(--green-bright);
+    font-size:11px; padding:6px 10px; border-radius:3px; letter-spacing:1px;
+  }
+  .copy-btn:hover{border-color:var(--green); background:rgba(0,255,65,0.06);}
+  .copy-btn.copied{border-color:var(--green); color:var(--green); }
+  .contact-actions{display:flex; gap:10px; flex-wrap:wrap;}
+
+  @media (max-width:560px){
+    .wrap{padding:24px 18px 70px;}
+    .brandbar{padding:16px 18px 0;}
+    .domain-grid, .chip-grid{grid-template-columns:1fr 1fr;}
+  }
+  @media (max-width:420px){
+    .domain-grid, .chip-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrixCanvas"></canvas>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<div class="brandbar">
+  <div class="brand">KAI<span class="cursor"></span></div>
+  <div class="brand-right">
+    <span class="step-indicator" id="stepIndicator"></span>
+    <button class="nav-link" id="navSupport">[ SUPPORT ]</button>
+  </div>
+</div>
+
+<!-- SCREEN 1: GATE -->
+<section class="screen active" id="screen-gate">
+  <div class="wrap">
+    <div class="resume-banner" id="resumeBanner">
+      <span>⚡ SAVED SESSION DETECTED — pick up where you left off?</span>
+      <span style="display:flex; gap:8px;">
+        <button id="btnResume">[ RESUME ]</button>
+        <button id="btnDismissResume">[ DISMISS ]</button>
+      </span>
+    </div>
+    <div class="gate-content" id="gateContent">
+      <div class="gate-badge">⚠ Root access required</div>
+      <div class="gate-logo">KAI</div>
+      <p class="gate-tagline">This is only for people who can't stop thinking about AI.</p>
+      <p class="gate-sub">Tell the system what pulls you in, pick a path, and it compiles a real roadmap — timed to however long you've actually got.</p>
+      <div class="gate-btn-row">
+        <button class="btn btn-primary" id="btnEnter">Jack in →</button>
+      </div>
+      <p class="gate-fine">basic interests · your domain · a roadmap built for your timeframe</p>
+    </div>
+    <div class="boot-log" id="bootLog"></div>
+  </div>
+</section>
+
+<!-- SCREEN 2: INTERESTS -->
+<section class="screen" id="screen-interests">
+  <div class="wrap">
+    <div class="step-head">
+      <button class="eyebrow-link" data-back="screen-gate">← back</button>
+      <h2 class="step-title">Quick gut-check.</h2>
+      <p class="step-desc">Pick whatever pulls you in. No wrong answers — this just helps the system star a few good-fit paths for you next.</p>
+    </div>
+    <div class="chip-grid" id="interestGrid"></div>
+    <div class="bottom-bar">
+      <button class="btn btn-primary" id="btnToDomains" disabled>Show me paths →</button>
+    </div>
+  </div>
+</section>
+
+<!-- SCREEN 3: DOMAINS -->
+<section class="screen" id="screen-domains">
+  <div class="wrap">
+    <div class="step-head">
+      <button class="eyebrow-link" data-back="screen-interests">← back</button>
+      <h2 class="step-title">Pick your path.</h2>
+      <p class="step-desc" id="domainsDesc">Every engineering path AI actually needs right now. Starred ones fit what you picked.</p>
+    </div>
+    <div class="domain-grid" id="domainGrid"></div>
+  </div>
+</section>
+
+<!-- SCREEN 4: TIMEFRAME -->
+<section class="screen" id="screen-timeframe">
+  <div class="wrap">
+    <div class="step-head">
+      <button class="eyebrow-link" data-back="screen-domains">← back</button>
+      <div class="context-pill" id="tfDomainPill"></div>
+      <h2 class="step-title">How much runway do you have?</h2>
+      <p class="step-desc">The system compresses or stretches the roadmap to fit. Be honest — a realistic timeframe beats an ambitious one.</p>
+    </div>
+    <div class="timeframe-grid" id="timeframeGrid"></div>
+    <div class="start-row">
+      <span class="label">when do you start</span>
+      <div class="radio-row" id="startRow"></div>
+    </div>
+    <div class="bottom-bar">
+      <button class="btn btn-primary" id="btnBuildRoadmap" disabled>Build my roadmap →</button>
+    </div>
+  </div>
+</section>
+
+<!-- SCREEN 5: ROADMAP -->
+<section class="screen" id="screen-roadmap">
+  <div class="wrap">
+    <div class="step-head">
+      <button class="eyebrow-link" data-back="screen-timeframe">← change timeframe</button>
+      <div class="roadmap-head">
+        <h2 class="roadmap-title" id="rmTitle"></h2>
+        <div class="roadmap-meta" id="rmMeta"></div>
+      </div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-labels">
+        <span>PROGRESS.LOG</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-cheer" id="progressCheer"></div>
+    </div>
+
+    <div class="timeline" id="timeline"></div>
+
+    <div class="motivation-box term">
+      <h3>🔥 KEEP_GOING.SH</h3>
+      <p class="quote-text" id="quoteText"></p>
+      <button class="quote-refresh" id="btnQuote">[ another one ]</button>
+      <div class="channel-row" id="channelRow"></div>
+    </div>
+
+    <div class="roadmap-actions">
+      <button class="btn btn-ghost" id="btnChangeDomain">Choose a different path</button>
+      <button class="btn btn-ghost" id="btnStartOver">Start over</button>
+    </div>
+  </div>
+</section>
+
+<!-- SCREEN 6: CONTACT / SUPPORT -->
+<section class="screen" id="screen-contact">
+  <div class="wrap">
+    <div class="step-head" style="max-width:520px; margin:0 auto; width:100%;">
+      <button class="eyebrow-link" data-back-dynamic="1">← back</button>
+    </div>
+    <div class="contact-card term">
+      <div class="term-bar">
+        <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
+        <span class="term-path">root@kai:~/support$</span>
+      </div>
+      <div class="contact-body">
+        <div class="contact-ascii">[ SUPPORT_CHANNEL ]
+status: online
+uptime: 99.9%</div>
+        <h3 class="contact-title">Need a human?</h3>
+        <p class="contact-desc">Bug reports, broken roadmaps, feature requests, or just want to say the matrix theme goes hard — reach out below. A real person reads this inbox.</p>
+        <div class="contact-line">
+          <span class="contact-email" id="contactEmail">horrific5143@gmail.com</span>
+          <button class="copy-btn" id="btnCopyEmail">[ copy ]</button>
+        </div>
+        <div class="contact-actions">
+          <a class="btn btn-primary" href="mailto:horrific5143@gmail.com?subject=KAI%20Support" style="text-decoration:none;">Send message →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ================= DATA ================= */
+
+const INTERESTS = [
+  {id:'products', label:'Building products', emoji:'🛠️'},
+  {id:'research', label:'Research & math', emoji:'🧠'},
+  {id:'data', label:'Data & statistics', emoji:'📊'},
+  {id:'infra', label:'Infra & systems', emoji:'🧩'},
+  {id:'customers', label:'Working with customers', emoji:'🤝'},
+  {id:'robotics', label:'Robotics & hardware', emoji:'🦾'},
+  {id:'language', label:'Language & communication', emoji:'💬'},
+  {id:'business', label:'Business & strategy', emoji:'📈'},
+];
+
+const DOMAINS = {
+  'ai-engineer': {
+    name:'AI Engineer',
+    icon:'🤖',
+    tagline:'Build real products powered by LLMs and ML models — pipelines, APIs, and applications.',
+    tags:['products','infra','research'],
+    modules:[
+      {weight:2, title:'Programming & Python Foundations', desc:'Get genuinely comfortable writing Python, working with APIs, and using Git.',
+       tasks:['Finish a Python fundamentals course','Build 2 small CLI or API projects','Get comfortable with Git & GitHub'],
+       resources:[{label:'freeCodeCamp — Python',url:'https://www.freecodecamp.org/learn/scientific-computing-with-python/'},{label:'CS50 (Harvard)',url:'https://cs50.harvard.edu/x/'}]},
+      {weight:2, title:'Math & ML Foundations', desc:'Just enough linear algebra, probability, and core ML theory to reason about models.',
+       tasks:['Watch a linear algebra intuition series','Complete an intro ML course','Implement linear & logistic regression from scratch'],
+       resources:[{label:'3Blue1Brown — Essence of Linear Algebra',url:'https://www.youtube.com/@3blue1brown'},{label:'Andrew Ng — Machine Learning Specialization',url:'https://www.coursera.org/specializations/machine-learning-introduction'}]},
+      {weight:2, title:'Deep Learning & Neural Nets', desc:'Understand how neural networks and transformers actually work under the hood.',
+       tasks:['Complete a deep learning course','Train a small neural net on a toy dataset','Read through how transformer attention works'],
+       resources:[{label:'DeepLearning.AI — Deep Learning Specialization',url:'https://www.deeplearning.ai/courses/deep-learning-specialization/'},{label:'Andrej Karpathy — Neural Networks: Zero to Hero',url:'https://www.youtube.com/@AndrejKarpathy'}]},
+      {weight:3, title:'Working with LLMs & APIs', desc:'Prompting, embeddings, retrieval-augmented generation, and evaluation.',
+       tasks:['Build a RAG app over your own documents','Practice structured prompting & evaluation','Learn how vector databases and embeddings work'],
+       resources:[{label:'DeepLearning.AI — Short Courses',url:'https://www.deeplearning.ai/short-courses/'},{label:'Hugging Face LLM Course',url:'https://huggingface.co/learn/llm-course'}]},
+      {weight:3, title:'ML/LLM App Engineering', desc:'Turn a model into a real, monitored, deployable product.',
+       tasks:['Deploy a model or LLM app behind an API','Add logging, evals, and basic guardrails','Containerize your app with Docker'],
+       resources:[{label:'Full Stack Deep Learning',url:'https://fullstackdeeplearning.com/'},{label:'Docker — Get Started',url:'https://docs.docker.com/get-started/'}]},
+      {weight:2, title:'Portfolio & Interview Prep', desc:'Package your work so it actually gets you interviews.',
+       tasks:['Publish 2–3 polished projects on GitHub','Write one project up as a short case study','Practice ML system-design questions'],
+       resources:[{label:'roadmap.sh — AI Engineer',url:'https://roadmap.sh/ai-engineer'}]},
+    ]
+  },
+  'forward-deployed-engineer': {
+    name:'Forward Deployed Engineer',
+    icon:'🚀',
+    tagline:'Sit inside a client\'s world and ship custom software fast — half engineer, half consultant.',
+    tags:['customers','products','business'],
+    modules:[
+      {weight:2, title:'Software Engineering Fundamentals', desc:'Full-stack basics: APIs, databases, and shipping working software quickly.',
+       tasks:['Build a small full-stack app (frontend + backend + DB)','Get comfortable with SQL joins and queries','Practice reading unfamiliar codebases fast'],
+       resources:[{label:'freeCodeCamp — Full Stack',url:'https://www.freecodecamp.org/'},{label:'SQLBolt — Interactive SQL',url:'https://sqlbolt.com/'}]},
+      {weight:2, title:'Data Wrangling & Integration', desc:'Real client data is messy. Get fast at cleaning, joining, and moving it.',
+       tasks:['Clean and merge 2–3 messy real-world datasets','Write an ETL script that ingests from an API into a DB','Practice working with JSON, CSV, and legacy formats'],
+       resources:[{label:'pandas Documentation',url:'https://pandas.pydata.org/docs/'},{label:'Krish Naik — Data Engineering playlists',url:'https://www.youtube.com/@krishnaik06'}]},
+      {weight:2, title:'Applied AI/ML Literacy', desc:'You don\'t need to train models from scratch — you need to know what to reach for and why.',
+       tasks:['Take a practical, applied ML or LLM course','Build one small project using an LLM API','Learn to evaluate "can AI solve this?" quickly'],
+       resources:[{label:'DeepLearning.AI — AI For Everyone',url:'https://www.deeplearning.ai/courses/ai-for-everyone/'},{label:'Hugging Face LLM Course',url:'https://huggingface.co/learn/llm-course'}]},
+      {weight:2, title:'Rapid Prototyping & Product Sense', desc:'Ship an MVP in days, not months, and iterate live with real users.',
+       tasks:['Build and ship a scrappy prototype in under a week','Practice cutting scope ruthlessly to hit a deadline','Get comfortable demoing unfinished work'],
+       resources:[{label:'Y Combinator — How to Build an MVP',url:'https://www.youtube.com/@ycombinator'}]},
+      {weight:2, title:'Client-Facing & Communication Skills', desc:'Translate messy business problems into scoped engineering work, and back again.',
+       tasks:['Practice writing a 1-page problem/solution brief','Run a mock discovery call and take structured notes','Practice explaining a technical tradeoff to a non-technical audience'],
+       resources:[{label:'Palantir — Forward Deployed Engineer overview',url:'https://www.palantir.com/careers/'}]},
+      {weight:2, title:'Field Deployment & Ownership', desc:'Deploy and support software in real, constrained environments — and own it end to end.',
+       tasks:['Deploy an app to a real (or simulated) production environment','Set up basic monitoring and error alerting','Write a short runbook for handing off your project'],
+       resources:[{label:'Docker — Get Started',url:'https://docs.docker.com/get-started/'},{label:'roadmap.sh — Backend',url:'https://roadmap.sh/backend'}]},
+    ]
+  },
+  'ml-engineer': {
+    name:'Machine Learning Engineer',
+    icon:'⚙️',
+    tagline:'Design, train, and ship ML models that hold up in production — not just in a notebook.',
+    tags:['research','infra','data'],
+    modules:[
+      {weight:2, title:'Programming & Math Foundations', desc:'Python, numpy, and the linear algebra/probability that ML sits on top of.',
+       tasks:['Get fluent in Python + NumPy + pandas','Review linear algebra and probability basics','Solve 20 practice problems on both'],
+       resources:[{label:'3Blue1Brown — Essence of Linear Algebra',url:'https://www.youtube.com/@3blue1brown'},{label:'StatQuest',url:'https://www.youtube.com/@statquest'}]},
+      {weight:2, title:'Classical Machine Learning', desc:'Regression, trees, ensembles, and how to evaluate models properly.',
+       tasks:['Implement 3 classical algorithms from scratch','Run a full model comparison on one dataset','Learn cross-validation and metric selection'],
+       resources:[{label:'Andrew Ng — Machine Learning Specialization',url:'https://www.coursera.org/specializations/machine-learning-introduction'},{label:'scikit-learn Docs',url:'https://scikit-learn.org/stable/'}]},
+      {weight:2, title:'Deep Learning', desc:'Neural networks, CNNs/transformers, and training them properly.',
+       tasks:['Complete a deep learning course','Train a model with a real training loop (not just fit())','Tune hyperparameters on one project'],
+       resources:[{label:'DeepLearning.AI — Deep Learning Specialization',url:'https://www.deeplearning.ai/courses/deep-learning-specialization/'},{label:'Andrej Karpathy — Neural Networks: Zero to Hero',url:'https://www.youtube.com/@AndrejKarpathy'}]},
+      {weight:2, title:'Feature Engineering & Data Pipelines', desc:'The unglamorous work that actually determines model quality.',
+       tasks:['Build a reproducible data pipeline for one project','Practice feature selection and engineering','Handle a dataset with missing/imbalanced data'],
+       resources:[{label:'pandas Documentation',url:'https://pandas.pydata.org/docs/'}]},
+      {weight:2, title:'Model Deployment & Serving', desc:'Get a model out of your notebook and into something that serves real requests.',
+       tasks:['Serve a model behind a REST API','Containerize it with Docker','Add basic monitoring for model drift'],
+       resources:[{label:'Docker — Get Started',url:'https://docs.docker.com/get-started/'},{label:'Full Stack Deep Learning',url:'https://fullstackdeeplearning.com/'}]},
+      {weight:2, title:'Portfolio & System Design', desc:'Package strong projects and prepare for ML system-design interviews.',
+       tasks:['Publish 2 end-to-end ML projects on GitHub','Write up your modeling decisions and tradeoffs','Practice an ML system-design mock interview'],
+       resources:[{label:'roadmap.sh — AI/ML Engineer',url:'https://roadmap.sh/ai-data-scientist'}]},
+    ]
+  },
+  'data-scientist': {
+    name:'Data Scientist',
+    icon:'📊',
+    tagline:'Turn messy data into decisions — statistics, modeling, and clear storytelling.',
+    tags:['data','research','business'],
+    modules:[
+      {weight:2, title:'Statistics & Probability', desc:'The foundation every good data scientist actually leans on daily.',
+       tasks:['Work through a statistics fundamentals course','Practice hypothesis testing on a real dataset','Learn common distributions and when they apply'],
+       resources:[{label:'StatQuest',url:'https://www.youtube.com/@statquest'},{label:'Khan Academy — Statistics & Probability',url:'https://www.khanacademy.org/math/statistics-probability'}]},
+      {weight:2, title:'Python/SQL for Data Work', desc:'Get fast at pulling, cleaning, and shaping data.',
+       tasks:['Get comfortable with pandas for data wrangling','Practice intermediate-to-advanced SQL queries','Clean a genuinely messy public dataset'],
+       resources:[{label:'SQLBolt',url:'https://sqlbolt.com/'},{label:'CodeBasics — Data Analytics',url:'https://www.youtube.com/@codebasics'}]},
+      {weight:2, title:'Exploratory Data Analysis & Visualization', desc:'Find the story in the data before you model anything.',
+       tasks:['Do a full EDA pass on a public dataset','Build 5 clear, well-labeled visualizations','Practice explaining findings in plain language'],
+       resources:[{label:'Matplotlib Documentation',url:'https://matplotlib.org/stable/tutorials/index.html'}]},
+      {weight:2, title:'Machine Learning Modeling', desc:'Apply the right model to the right problem, and know why.',
+       tasks:['Build and evaluate 3 different model types on one problem','Practice feature selection and validation','Document your modeling tradeoffs'],
+       resources:[{label:'Andrew Ng — Machine Learning Specialization',url:'https://www.coursera.org/specializations/machine-learning-introduction'}]},
+      {weight:2, title:'Storytelling & Communication', desc:'A model nobody understands or trusts doesn\'t create value.',
+       tasks:['Turn one analysis into a slide-style summary for non-technical readers','Practice a 5-minute "so what" pitch of your findings','Get feedback from someone outside data/ML'],
+       resources:[{label:'CodeBasics — Data Storytelling',url:'https://www.youtube.com/@codebasics'}]},
+      {weight:2, title:'Portfolio Project', desc:'One meaty, end-to-end project beats five half-finished ones.',
+       tasks:['Pick a real dataset and problem you actually care about','Take it from raw data to a written case study','Publish it with clear, reproducible code'],
+       resources:[{label:'Kaggle Datasets',url:'https://www.kaggle.com/datasets'}]},
+    ]
+  },
+  'mlops-engineer': {
+    name:'MLOps Engineer',
+    icon:'🧰',
+    tagline:'Build the pipelines and infrastructure that keep ML systems running in production.',
+    tags:['infra','data'],
+    modules:[
+      {weight:2, title:'Software Engineering & Linux Basics', desc:'Solid engineering fundamentals plus comfort in a terminal.',
+       tasks:['Get comfortable with the Linux command line','Practice writing clean, tested Python scripts','Learn shell scripting basics'],
+       resources:[{label:'freeCodeCamp — Linux',url:'https://www.freecodecamp.org/'}]},
+      {weight:2, title:'ML Fundamentals for Ops', desc:'You don\'t need to design models, but you need to understand what you\'re deploying.',
+       tasks:['Complete an applied ML fundamentals course','Train and export one model end-to-end','Understand common failure modes (drift, skew)'],
+       resources:[{label:'DeepLearning.AI — Machine Learning in Production',url:'https://www.deeplearning.ai/courses/machine-learning-engineering-for-production-mlops/'}]},
+      {weight:2, title:'Containers & Orchestration', desc:'Docker and Kubernetes — how ML workloads actually run at scale.',
+       tasks:['Containerize a full ML app with Docker','Deploy a multi-container app with Docker Compose','Learn Kubernetes basics (pods, deployments, services)'],
+       resources:[{label:'Docker — Get Started',url:'https://docs.docker.com/get-started/'},{label:'Kubernetes Docs — Basics',url:'https://kubernetes.io/docs/tutorials/kubernetes-basics/'}]},
+      {weight:2, title:'CI/CD & Automation', desc:'Automate testing, training, and deployment so it doesn\'t all rely on you clicking buttons.',
+       tasks:['Set up a CI/CD pipeline for a small project','Automate model retraining on new data','Add automated tests for a data pipeline'],
+       resources:[{label:'GitHub Actions Docs',url:'https://docs.github.com/en/actions'}]},
+      {weight:2, title:'Monitoring & Model Serving', desc:'Ship a model behind an API and know the moment something breaks.',
+       tasks:['Serve a model via a REST API','Add logging, alerting, and a health check','Track basic model performance metrics over time'],
+       resources:[{label:'Full Stack Deep Learning',url:'https://fullstackdeeplearning.com/'}]},
+      {weight:2, title:'Cloud & Capstone Project', desc:'Put it all together on real cloud infrastructure.',
+       tasks:['Deploy one project on AWS, GCP, or Azure free tier','Document your architecture end-to-end','Write up lessons learned as a portfolio piece'],
+       resources:[{label:'roadmap.sh — DevOps',url:'https://roadmap.sh/devops'}]},
+    ]
+  },
+  'ai-product-manager': {
+    name:'AI Product Manager',
+    icon:'🧭',
+    tagline:'Decide what AI product to build, why, and whether it\'s actually working.',
+    tags:['business','customers','language'],
+    modules:[
+      {weight:2, title:'Product Management Fundamentals', desc:'The core PM toolkit: discovery, prioritization, and writing clear specs.',
+       tasks:['Complete an intro product management course','Write one PRD (product requirements doc) for a real idea','Practice a prioritization framework (RICE, MoSCoW, etc.)'],
+       resources:[{label:'Y Combinator — Startup School',url:'https://www.startupschool.org/'}]},
+      {weight:2, title:'AI/ML Literacy for PMs', desc:'You need to know what\'s realistic to ask for — not how to build it yourself.',
+       tasks:['Take a non-technical AI/ML fundamentals course','Learn the basics of how LLMs and evals work','Sit in on (or shadow) an ML team\'s planning session'],
+       resources:[{label:'DeepLearning.AI — AI For Everyone',url:'https://www.deeplearning.ai/courses/ai-for-everyone/'}]},
+      {weight:2, title:'Data-Informed Decision Making', desc:'Read metrics and experiments well enough to make real calls.',
+       tasks:['Design one A/B test end-to-end','Practice reading a dashboard and forming a hypothesis','Learn basic statistical significance concepts'],
+       resources:[{label:'Khan Academy — Statistics & Probability',url:'https://www.khanacademy.org/math/statistics-probability'}]},
+      {weight:2, title:'Working with ML Teams', desc:'Scope AI features realistically and negotiate tradeoffs with engineers.',
+       tasks:['Write a scoping doc for an AI feature, including risks','Practice explaining model limitations to stakeholders','Define success metrics/evals for an AI feature'],
+       resources:[{label:'Hugging Face LLM Course',url:'https://huggingface.co/learn/llm-course'}]},
+      {weight:2, title:'Responsible & Trustworthy AI', desc:'Know the failure modes before a user finds them for you.',
+       tasks:['Study 2–3 real-world AI failure case studies','Draft a basic risk/safety checklist for an AI feature','Learn the basics of bias and fairness in ML systems'],
+       resources:[{label:'Partnership on AI',url:'https://partnershiponai.org/'}]},
+      {weight:2, title:'Portfolio & Case Studies', desc:'Show your thinking, not just your title.',
+       tasks:['Write up one end-to-end AI product case study','Include the problem, tradeoffs, metrics, and outcome','Get feedback from a PM or engineer'],
+       resources:[{label:'roadmap.sh — Product Manager',url:'https://roadmap.sh/product-manager'}]},
+    ]
+  },
+  'prompt-engineer': {
+    name:'Prompt / LLM Engineer',
+    icon:'🧵',
+    tagline:'Get the most out of large language models — prompting, evaluation, and building on top of them.',
+    tags:['language','products','research'],
+    modules:[
+      {weight:2, title:'LLM Fundamentals', desc:'How large language models actually generate text, and where they break.',
+       tasks:['Take an intro course on how LLMs work','Learn tokens, context windows, and temperature/sampling','Read about common failure modes (hallucination, bias)'],
+       resources:[{label:'Hugging Face LLM Course',url:'https://huggingface.co/learn/llm-course'},{label:'Andrej Karpathy — Intro to Large Language Models',url:'https://www.youtube.com/@AndrejKarpathy'}]},
+      {weight:2, title:'Prompting Techniques & Evaluation', desc:'Go from "guessing" to systematic, testable prompting.',
+       tasks:['Practice few-shot, chain-of-thought, and role prompting','Build a small evaluation set for one task','A/B test two prompt versions against your eval set'],
+       resources:[{label:'DeepLearning.AI — Prompt Engineering',url:'https://www.deeplearning.ai/short-courses/'}]},
+      {weight:2, title:'RAG & Tool Use', desc:'Ground models in real data and let them take actions.',
+       tasks:['Build a retrieval-augmented generation (RAG) app','Connect an LLM to a real tool or function call','Learn vector databases and embeddings basics'],
+       resources:[{label:'Hugging Face LLM Course',url:'https://huggingface.co/learn/llm-course'}]},
+      {weight:2, title:'Fine-Tuning & Customization Basics', desc:'Know when prompting is enough — and when it isn\'t.',
+       tasks:['Learn the difference between prompting, RAG, and fine-tuning','Try a lightweight fine-tuning tutorial on a small open model','Document when you\'d reach for each approach'],
+       resources:[{label:'Hugging Face — Fine-tuning guide',url:'https://huggingface.co/docs/transformers/training'}]},
+      {weight:2, title:'Building LLM Products', desc:'Ship something people can actually use.',
+       tasks:['Build a small end-to-end LLM-powered app','Add guardrails, logging, and basic safety checks','Get 3 real people to test it and give feedback'],
+       resources:[{label:'Full Stack Deep Learning',url:'https://fullstackdeeplearning.com/'}]},
+      {weight:2, title:'Portfolio & Specialization', desc:'Show real, evaluated work — not just clever prompts.',
+       tasks:['Publish 1–2 LLM projects with your eval results included','Write up your prompting/evaluation approach','Pick a niche (RAG, agents, evals) to go deeper in'],
+       resources:[{label:'roadmap.sh — AI Engineer',url:'https://roadmap.sh/ai-engineer'}]},
+    ]
+  },
+  'robotics-engineer': {
+    name:'Robotics Engineer',
+    icon:'🦾',
+    tagline:'Bring AI into the physical world — perception, motion, and control on real hardware.',
+    tags:['robotics','infra','research'],
+    modules:[
+      {weight:2, title:'Programming & Math Foundations', desc:'Python/C++ plus the linear algebra and control theory robotics runs on.',
+       tasks:['Get comfortable with both Python and C++ basics','Review linear algebra and coordinate transforms','Learn the basics of control theory (PID controllers)'],
+       resources:[{label:'3Blue1Brown — Essence of Linear Algebra',url:'https://www.youtube.com/@3blue1brown'}]},
+      {weight:2, title:'Electronics & Mechanics Basics', desc:'Understand the hardware your code will actually run on.',
+       tasks:['Learn basic circuits and sensor wiring','Get hands-on with a microcontroller (Arduino/Raspberry Pi)','Read up on actuators and motor control basics'],
+       resources:[{label:'Arduino — Getting Started',url:'https://www.arduino.cc/en/Guide'}]},
+      {weight:2, title:'ROS (Robot Operating System)', desc:'The standard framework robotics teams actually build on.',
+       tasks:['Complete a ROS/ROS2 fundamentals tutorial','Build a simple publisher/subscriber node','Simulate a basic robot in a simulator (e.g. Gazebo)'],
+       resources:[{label:'ROS Documentation',url:'https://docs.ros.org/'},{label:'Articulated Robotics',url:'https://www.youtube.com/@ArticulatedRobotics'}]},
+      {weight:2, title:'Perception', desc:'Let the robot understand its environment using cameras and sensors.',
+       tasks:['Complete an intro computer vision course','Process real sensor or camera data on a small project','Try basic object detection on a live or recorded feed'],
+       resources:[{label:'OpenCV — Tutorials',url:'https://docs.opencv.org/4.x/d9/df8/tutorial_root.html'}]},
+      {weight:2, title:'Motion Planning & Control', desc:'Get a robot from point A to point B, safely and smoothly.',
+       tasks:['Implement a basic path-planning algorithm','Tune a PID controller on a simulated or real system','Learn the basics of SLAM (mapping + localization)'],
+       resources:[{label:'ROS Documentation — Navigation',url:'https://docs.ros.org/'}]},
+      {weight:2, title:'Capstone Robotics Project', desc:'Put perception, planning, and control together on one real system.',
+       tasks:['Pick one end-to-end robot task (navigate, grasp, follow)','Build and test it in simulation or on real hardware','Document your build with video/photos for your portfolio'],
+       resources:[{label:'roadmap.sh — Software Design & Architecture',url:'https://roadmap.sh/'}]},
+    ]
+  },
+};
+
+const QUOTES = [
+  "Momentum beats motivation. Do one small thing on this roadmap today.",
+  "You don't need to feel ready. You need to open the next task.",
+  "Every expert you admire had a day-one version of this checklist too.",
+  "Progress you can't see yet is still progress. Keep the streak alive.",
+  "Consistency is the whole strategy. Show up again tomorrow.",
+  "The gap between interested and skilled is just repetition. Put in the rep.",
+  "You're not behind. You're on week one of someone's whole career.",
+  "Done beats perfect, especially on the first pass through anything new.",
+  "Future-you is being built by what you check off this week.",
+  "Small, boring, daily effort is what actually compounds into skill.",
+];
+
+const CHANNELS = [
+  {label:'3Blue1Brown', url:'https://www.youtube.com/@3blue1brown'},
+  {label:'Andrej Karpathy', url:'https://www.youtube.com/@AndrejKarpathy'},
+  {label:'StatQuest', url:'https://www.youtube.com/@statquest'},
+  {label:'freeCodeCamp', url:'https://www.youtube.com/@freecodecamp'},
+  {label:'Krish Naik', url:'https://www.youtube.com/@krishnaik06'},
+];
+
+/* ================= STATE ================= */
+const state = {
+  interests: new Set(),
+  domainKey: null,
+  months: null,
+  startWhen: null,
+  checked: new Set(), // "moduleIdx-taskIdx"
+};
+let lastScreenBeforeContact = 'screen-gate';
+let currentScreen = 'screen-gate';
+
+/* ================= STORAGE ================= */
+/* Uses the browser's own localStorage — works on any real deployment
+   (GitHub Pages, Netlify, Vercel, custom domain, etc.) with no backend.
+   Progress is saved per-browser, per-device. */
+const STORAGE_KEY = 'kai_progress_v1';
+async function saveState(){
+  try{
+    if(!window.localStorage) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      interests:[...state.interests],
+      domainKey: state.domainKey,
+      months: state.months,
+      startWhen: state.startWhen,
+      checked: [...state.checked],
+    }));
+  }catch(e){ console.error('KAI: storage save failed', e); }
+}
+async function loadState(){
+  try{
+    if(!window.localStorage) return null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){ /* not found, disabled, or unavailable — that's fine */ }
+  return null;
+}
+async function clearState(){
+  try{
+    if(!window.localStorage) return;
+    localStorage.removeItem(STORAGE_KEY);
+  }catch(e){ /* ignore */ }
+}
+
+/* ================= HELPERS ================= */
+function show(id){
+  if(id !== 'screen-contact') lastScreenBeforeContact = id;
+  currentScreen = id;
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({top:0, behavior:'instant'});
+  const labels = {
+    'screen-gate':'', 'screen-interests':'STEP 1/4', 'screen-domains':'STEP 2/4',
+    'screen-timeframe':'STEP 3/4', 'screen-roadmap':'STEP 4/4', 'screen-contact':'SUPPORT'
+  };
+  document.getElementById('stepIndicator').textContent = labels[id] || '';
+
+  const canvas = document.getElementById('matrixCanvas');
+  canvas.classList.toggle('rain-hero', id==='screen-gate');
+}
+
+document.querySelectorAll('[data-back]').forEach(btn=>{
+  btn.addEventListener('click', ()=> show(btn.dataset.back));
+});
+document.querySelector('[data-back-dynamic]').addEventListener('click', ()=> show(lastScreenBeforeContact));
+document.getElementById('navSupport').addEventListener('click', ()=> show('screen-contact'));
+
+/* ---- Gate ---- */
+document.getElementById('btnEnter').addEventListener('click', ()=> show('screen-interests'));
+
+/* ---- Boot sequence (decorative, non-blocking) ---- */
+const BOOT_LINES = [
+  {text:'BOOTING KAI_OS v2.077 ...', ok:false},
+  {text:'LOADING NEURAL PATHWAYS ...', ok:false},
+  {text:'SCANNING FOR ENTHUSIASM ...', ok:false},
+  {text:'ACCESS GRANTED.', ok:true},
+];
+function runBootSequence(){
+  const log = document.getElementById('bootLog');
+  let i = 0;
+  function nextLine(){
+    if(i >= BOOT_LINES.length){
+      document.getElementById('gateContent').classList.add('revealed');
+      return;
+    }
+    const line = BOOT_LINES[i];
+    const div = document.createElement('div');
+    if(line.ok) div.className='ok';
+    div.textContent = '> ' + line.text;
+    log.appendChild(div);
+    i++;
+    setTimeout(nextLine, 420);
+  }
+  setTimeout(nextLine, 300);
+}
+
+/* ---- Matrix rain ---- */
+(function initRain(){
+  const canvas = document.getElementById('matrixCanvas');
+  const ctx = canvas.getContext('2d');
+  let w, h, columns, drops;
+  const fontSize = 16;
+  function resize(){
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+    columns = Math.floor(w / fontSize);
+    drops = new Array(columns).fill(0).map(()=> Math.floor(Math.random()* -50));
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  function draw(){
+    ctx.fillStyle = 'rgba(5,7,5,0.10)';
+    ctx.fillRect(0,0,w,h);
+    ctx.font = fontSize+'px monospace';
+    for(let i=0;i<columns;i++){
+      const char = Math.random() > 0.5 ? '1' : '0';
+      const y = drops[i]*fontSize;
+      ctx.fillStyle = Math.random() > 0.93 ? '#c9ffd6' : '#00ff41';
+      ctx.fillText(char, i*fontSize, y);
+      if(y > h && Math.random() > 0.975){
+        drops[i] = 0;
+      }
+      drops[i]++;
+    }
+  }
+  setInterval(draw, 45);
+})();
+
+/* ---- Interests ---- */
+const interestGrid = document.getElementById('interestGrid');
+INTERESTS.forEach(it=>{
+  const btn = document.createElement('button');
+  btn.className='chip';
+  btn.dataset.id = it.id;
+  btn.innerHTML = `<span class="emoji">${it.emoji}</span><span>${it.label}</span>`;
+  btn.addEventListener('click', ()=>{
+    if(state.interests.has(it.id)){ state.interests.delete(it.id); btn.classList.remove('selected'); }
+    else { state.interests.add(it.id); btn.classList.add('selected'); }
+    document.getElementById('btnToDomains').disabled = state.interests.size===0;
+    saveState();
+  });
+  interestGrid.appendChild(btn);
+});
+document.getElementById('btnToDomains').addEventListener('click', ()=>{
+  renderDomains();
+  show('screen-domains');
+});
+
+/* ---- Domains ---- */
+const domainGrid = document.getElementById('domainGrid');
+function renderDomains(){
+  domainGrid.innerHTML='';
+  const entries = Object.entries(DOMAINS);
+  entries.sort((a,b)=>{
+    const fitA = a[1].tags.some(t=>state.interests.has(t)) ? 1 : 0;
+    const fitB = b[1].tags.some(t=>state.interests.has(t)) ? 1 : 0;
+    return fitB - fitA;
+  });
+  entries.forEach(([key, d])=>{
+    const isFit = d.tags.some(t=>state.interests.has(t));
+    const card = document.createElement('button');
+    card.className='domain-card term';
+    card.innerHTML = `
+      <div class="term-bar">
+        <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
+        <span class="term-path">${key}.roadmap</span>
+      </div>
+      <div class="domain-body">
+        <span class="domain-icon">${d.icon}</span>
+        <div class="domain-name">${d.name} ${isFit ? '<span class="badge-fit">good fit</span>' : ''}</div>
+        <div class="domain-tagline">${d.tagline}</div>
+        <div class="domain-cta">./view_roadmap →</div>
+      </div>
+    `;
+    card.addEventListener('click', ()=>{
+      state.domainKey = key;
+      state.checked = new Set();
+      state.months = null;
+      state.startWhen = null;
+      saveState();
+      openTimeframe();
+    });
+    domainGrid.appendChild(card);
+  });
+  const fitCount = entries.filter(([k,d])=>d.tags.some(t=>state.interests.has(t))).length;
+  document.getElementById('domainsDesc').textContent = fitCount
+    ? `Every engineering path AI actually needs right now. We starred ${fitCount} that match what you picked.`
+    : `Every engineering path AI actually needs right now — pick whichever pulls at you.`;
+}
+
+/* ---- Timeframe ---- */
+const TF_OPTIONS = [
+  {months:1, label:'1 Month', sub:'sprint mode'},
+  {months:2, label:'2 Months', sub:'focused'},
+  {months:3, label:'3 Months', sub:'steady pace'},
+  {months:6, label:'6 Months', sub:'thorough'},
+  {months:12, label:'12 Months', sub:'deep mastery'},
+];
+const START_OPTIONS = ['Right now', 'In a few days', 'Next week', 'Later this month'];
+
+function openTimeframe(){
+  const d = DOMAINS[state.domainKey];
+  document.getElementById('tfDomainPill').innerHTML = `${d.icon} ${d.name}`;
+
+  const tfGrid = document.getElementById('timeframeGrid');
+  tfGrid.innerHTML='';
+  TF_OPTIONS.forEach(opt=>{
+    const c = document.createElement('button');
+    c.className='tf-chip';
+    if(state.months === opt.months) c.classList.add('selected');
+    c.innerHTML = `${opt.label}<small>${opt.sub}</small>`;
+    c.addEventListener('click', ()=>{
+      state.months = opt.months;
+      [...tfGrid.children].forEach(ch=>ch.classList.remove('selected'));
+      c.classList.add('selected');
+      saveState();
+      checkTfReady();
+    });
+    tfGrid.appendChild(c);
+  });
+
+  const startRow = document.getElementById('startRow');
+  startRow.innerHTML='';
+  START_OPTIONS.forEach(s=>{
+    const c = document.createElement('button');
+    c.className='radio-chip';
+    if(state.startWhen === s) c.classList.add('selected');
+    c.textContent = s;
+    c.addEventListener('click', ()=>{
+      state.startWhen = s;
+      [...startRow.children].forEach(ch=>ch.classList.remove('selected'));
+      c.classList.add('selected');
+      saveState();
+      checkTfReady();
+    });
+    startRow.appendChild(c);
+  });
+
+  checkTfReady();
+  show('screen-timeframe');
+}
+function checkTfReady(){
+  document.getElementById('btnBuildRoadmap').disabled = !(state.months && state.startWhen);
+}
+document.getElementById('btnBuildRoadmap').addEventListener('click', ()=>{
+  renderRoadmap();
+  show('screen-roadmap');
+});
+
+/* ---- Roadmap ---- */
+function scheduleModules(modules, months){
+  const totalWeight = modules.reduce((s,m)=>s+m.weight,0);
+  const totalDays = months*30;
+  let cursor = 0;
+  return modules.map(m=>{
+    const days = Math.max(1, Math.round(totalDays * m.weight/totalWeight));
+    const start = cursor+1;
+    cursor += days;
+    return {...m, startDay:start, endDay:cursor};
+  });
+}
+function formatRange(startDay, endDay, months){
+  if(months<=2){
+    return startDay===endDay ? `Day ${startDay}` : `Day ${startDay}–${endDay}`;
+  } else if(months<=6){
+    const w1 = Math.ceil(startDay/7), w2 = Math.ceil(endDay/7);
+    return w1===w2 ? `Week ${w1}` : `Week ${w1}–${w2}`;
+  } else {
+    const m1 = Math.ceil(startDay/30), m2 = Math.ceil(endDay/30);
+    return m1===m2 ? `Month ${m1}` : `Month ${m1}–${m2}`;
+  }
+}
+
+function renderRoadmap(){
+  const d = DOMAINS[state.domainKey];
+  document.getElementById('rmTitle').textContent = `${d.icon} ${d.name} Roadmap`;
+  document.getElementById('rmMeta').textContent =
+    `${state.months} month${state.months>1?'s':''} · starting ${state.startWhen.toLowerCase()} · ${d.modules.length} milestones`;
+
+  const scheduled = scheduleModules(d.modules, state.months);
+  const timeline = document.getElementById('timeline');
+  timeline.innerHTML='';
+
+  scheduled.forEach((m, mi)=>{
+    const modEl = document.createElement('div');
+    modEl.className='module';
+    modEl.dataset.moduleIndex = mi;
+
+    const tasksHtml = m.tasks.map((t,ti)=>{
+      const key = `${mi}-${ti}`;
+      const checked = state.checked.has(key);
+      return `<li class="${checked?'checked':''}" data-key="${key}">
+        <input type="checkbox" id="cb-${key}" ${checked?'checked':''}>
+        <label for="cb-${key}">${t}</label>
+      </li>`;
+    }).join('');
+
+    const resHtml = m.resources.map(r=>`<a class="resource-pill" href="${r.url}" target="_blank" rel="noopener">🔗 ${r.label}</a>`).join('');
+
+    modEl.innerHTML = `
+      <div class="module-node">${mi+1}</div>
+      <div class="module-card term">
+        <span class="module-week">${formatRange(m.startDay, m.endDay, state.months)}</span>
+        <div class="module-title">${m.title}</div>
+        <div class="module-desc">${m.desc}</div>
+        <div class="resource-row">${resHtml}</div>
+        <ul class="task-list">${tasksHtml}</ul>
+      </div>
+    `;
+    timeline.appendChild(modEl);
+  });
+
+  timeline.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const li = cb.closest('li');
+      const key = li.dataset.key;
+      if(cb.checked){ state.checked.add(key); li.classList.add('checked'); }
+      else { state.checked.delete(key); li.classList.remove('checked'); }
+      updateProgress();
+      saveState();
+    });
+  });
+
+  updateProgress();
+  showQuote();
+  renderChannels();
+}
+
+function updateProgress(){
+  const d = DOMAINS[state.domainKey];
+  const totalTasks = d.modules.reduce((s,m)=>s+m.tasks.length,0);
+  const done = state.checked.size;
+  const pct = totalTasks ? Math.round((done/totalTasks)*100) : 0;
+  document.getElementById('progressFill').style.width = pct+'%';
+  document.getElementById('progressPct').textContent = `${pct}% · ${done}/${totalTasks} tasks`;
+
+  document.querySelectorAll('.module').forEach(modEl=>{
+    const items = modEl.querySelectorAll('.task-list li');
+    const allDone = [...items].every(li=>li.classList.contains('checked'));
+    modEl.classList.toggle('done', allDone && items.length>0);
+  });
+
+  const cheer = document.getElementById('progressCheer');
+  if(pct===0) cheer.textContent='';
+  else if(pct<25) cheer.textContent="> you're moving. that's the hard part.";
+  else if(pct<50) cheer.textContent="> solid progress — don't break the streak.";
+  else if(pct<75) cheer.textContent="> past the halfway point. keep stacking days.";
+  else if(pct<100) cheer.textContent="> so close. finish the last stretch.";
+  else cheer.textContent="> SYSTEM: MASTERY ACHIEVED. go build something real with it.";
+}
+
+function showQuote(){
+  document.getElementById('quoteText').textContent = QUOTES[Math.floor(Math.random()*QUOTES.length)];
+}
+document.getElementById('btnQuote').addEventListener('click', showQuote);
+
+function renderChannels(){
+  const row = document.getElementById('channelRow');
+  row.innerHTML='';
+  CHANNELS.forEach(c=>{
+    const a = document.createElement('a');
+    a.className='channel-pill';
+    a.href = c.url; a.target='_blank'; a.rel='noopener';
+    a.textContent = '▶ '+c.label;
+    row.appendChild(a);
+  });
+}
+
+document.getElementById('btnChangeDomain').addEventListener('click', ()=>{
+  renderDomains();
+  show('screen-domains');
+});
+document.getElementById('btnStartOver').addEventListener('click', ()=>{
+  state.interests.clear();
+  state.domainKey=null; state.months=null; state.startWhen=null; state.checked=new Set();
+  document.querySelectorAll('#interestGrid .chip').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('btnToDomains').disabled = true;
+  clearState();
+  show('screen-gate');
+});
+
+/* ---- Contact / Support ---- */
+document.getElementById('btnCopyEmail').addEventListener('click', async ()=>{
+  const email = document.getElementById('contactEmail').textContent;
+  const btn = document.getElementById('btnCopyEmail');
+  try{
+    await navigator.clipboard.writeText(email);
+    btn.textContent = '[ copied ✓ ]';
+    btn.classList.add('copied');
+  }catch(e){
+    btn.textContent = '[ select & copy ]';
+  }
+  setTimeout(()=>{ btn.textContent='[ copy ]'; btn.classList.remove('copied'); }, 2200);
+});
+
+/* ---- Resume banner ---- */
+document.getElementById('btnResume').addEventListener('click', ()=>{
+  document.getElementById('resumeBanner').style.display='none';
+  renderRoadmap();
+  show('screen-roadmap');
+});
+document.getElementById('btnDismissResume').addEventListener('click', ()=>{
+  document.getElementById('resumeBanner').style.display='none';
+});
+
+/* ---- Init ---- */
+(async function init(){
+  runBootSequence();
+  const saved = await loadState();
+  if(saved && saved.domainKey && DOMAINS[saved.domainKey]){
+    state.interests = new Set(saved.interests || []);
+    state.domainKey = saved.domainKey;
+    state.months = saved.months || null;
+    state.startWhen = saved.startWhen || null;
+    state.checked = new Set(saved.checked || []);
+    document.querySelectorAll('#interestGrid .chip').forEach(c=>{
+      if(state.interests.has(c.dataset.id)) c.classList.add('selected');
+    });
+    document.getElementById('btnToDomains').disabled = state.interests.size===0;
+    document.getElementById('resumeBanner').style.display='flex';
+  } else if(saved && saved.interests && saved.interests.length){
+    state.interests = new Set(saved.interests);
+    document.querySelectorAll('#interestGrid .chip').forEach(c=>{
+      if(state.interests.has(c.dataset.id)) c.classList.add('selected');
+    });
+    document.getElementById('btnToDomains').disabled = state.interests.size===0;
+  }
+})();
+</script>
+</body>
+</html>
